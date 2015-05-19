@@ -25,20 +25,14 @@ class Restaurants(db.Model):
         self.reviews = reviews
 
 
-
-@app.route('/rest/', methods = ['GET'])
-
+@app.route('/rest/<int:id>/', methods = ['GET'])
 def get_rest(id):    
     return jsonify({'Restaurants': Restaurants.query.get(id)})
 
 
-
-@app.route('/rest/<int:id>/', methods = ['GET'])
-
+@app.route('/rest/', methods = ['GET'])
 def get_all():
     return jsonify({'Restaurants': Restaurants.query.all()})
-
-
 
 @app.route('/rest/', methods = ['POST'])
 
