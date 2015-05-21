@@ -81,8 +81,9 @@ class Auctionhouse(db.Model):
 
 @app.route('/rest/findbyid/<int:id>/', methods = ['GET'])
 def get_rest(id):    
-    query = Restaurants.query.filter_by(id=id).all()
-    return jsonify({'restaurants':query})
+    query = Restaurants.query.filter_by(id=id).first()
+    return jsonify({'stuff':query})
+    # return jsonify({'restaurant_name':query.Name, 'restaurant_address':query.Address, 'phone':query.Phone})
 
 @app.route('/rest/', methods = ['GET'])
 def get_all():
