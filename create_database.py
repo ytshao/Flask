@@ -1,18 +1,6 @@
-import sqlite3
+from Restaurants import db
 
-conn = sqlite3.connect('Restaurants.db')
+db.create_all()
 
-c = conn.cursor()
-
-# Create Table Restaruants under database
-c.exectute('''
-        CREATE TABLE Restaurants (
-        id INTEGER,
-        name TEXT,
-        visitDate TEXT,
-        reviews REAL,)
-        ''')
-
-conn.commit()
 
 
