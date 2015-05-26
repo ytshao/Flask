@@ -5,90 +5,18 @@ from flask.ext.sqlalchemy import SQLAlchemy
 
 from flask.ext.restless import APIManager
 
-app = Flask(__name__)
+from Model import *
 
-app.config.from_pyfile('Config.py')
+from Superpass import superpass
 
-# Database component
-
-db = SQLAlchemy(app)
-
-class Restaurants(db.Model):
-    
-    id = db.Column(db.Integer)
-    Name = db.Column(db.String(50))
-    City = db.Column(db.String(50))
-    Neighborhood = db.Column(db.String(100))
-    Address = db.Column(db.String(200))
-    Picture_url = db.Column(db.String(100))
-    Latitude = db.Column(db.Float)
-    Longitude = db.Column(db.Float)
-    Rating = db.Column(db.Float)
-    Review_Count = db.Column(db.Integer)
-    Phone = db.Column(db.Integer)
-    Rest_key = db.Column(db.String(200), primary_key=True)
-
-    def __init__(self, Name, City, Neighborhood, Address, Picture_url, Latitude,Longitude, Rating, Review_Count, Phone, Rest_key):
-        self.Name = Name
-        self.City = City
-        self.Neighborhood = Neighborhood
-        self.Address = Address
-        self.Picture_url = Picture_url
-        self.Latitude = Latitude
-        self.Longitude = Longitude
-        self.Rating = Rating
-        self.Review_Count = Review_Count
-        self.Phone = Phone
-        self.Rest_key = Rest_key
-        
-    def to_dict(self):
-        # return {"Name":self.Name, "City":self.City}
-        return {"Name":self.Name, "City":self.City, "Neighborhood":self.Neighborhood, "Latitude":self.Latitude, "Longitude":self.Longitude, "Rating":self.Rating,"Review_Count":self.Review_Count, "Phone":self.Phone, "Rest_key":self.Rest_key}
-
-class Users(db.Model):
-    id = db.Column(db.Integer)
-    Lastname = db.Column(db.String(50))
-    Firstname = db.Column(db.String(50))
-    Facebook_id = db.Column(db.String(100), primary_key=True)
-    Credits = db.Column(db.Integer)
-    Scores = db.Column(db.Float)
-    Number_of_scores = db.Column(db.Integer)
-    Number_of_runs = db.Column(db.Integer)
-    Give_current = db.Column(db.Boolean)
-    Receive_current = db.Column(db.Boolean)
-
-    def __init__(self, Lastname, Firstname, Facebook_id, Credits, Scores, Number_of_scores, Number_of_runs, Give_current, Receive_current):
-        self.Lastname = Lastname
-        self.Firstname = Firstname
-        self.Facebook_id = Facebook_id
-        self.Credits = Credits
-        self.Scores = Scores
-        self.Number_of_scores = Number_of_scores
-        self.Number_of_runs = Number_of_runs
-        self.Give_current = Give_current
-        self.Receive_current = Receive_current
-
-    def to_dict(self):
-        return {"Lastname":self.Lastname, "Firstname":self.Firstname, "Facebook_id":self.Facebook_id, "Credits":self.Credits, "Scores":self.Scores, "Number_of_scores":self.Number_of_scores, "Number_of_runs":self.Number_of_runs, "Give_current":self.Give_current, "Receive_current":self.Receive_current}
-    
-class Auctionhouse(db.Model):
-    id = db.Column(db.Integer)
-    Restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurants.id'))
-    date = db.Column(db.Date)
-    slot_time = db.Column(db.DateTime)
-    Rest_slot = db.Column(db.String(100), primary_key=True)
-
-    def __init__(self, Restaurant_id, date, slot_time, Rest_slot):
-        self.Restaurant_id = Restaurant_id
-        self.date = date
-        self.slot_time = slot_time
-        self.Rest_slot = Rest_slot
-
-    def to_dict(self):
-        return {"Restaurant_id":self.Restaurant_id, "date":self.date, "slot_time":self.slot_time, "Rest_slot":self.Rest_slot}
-
+from passlib.apps import custom_app_context as pwd_context
 
 # API Functions
+
+auth = HTTPBasicAuth()
+
+# GET requests
+
 @app.route('/restaurants/findbyid/<int:id>/', methods = ['GET'])
 def get_rest(id):    
     query = Restaurants.query.filter_by(id=id).all()
@@ -124,20 +52,74 @@ def get_auctionhouse_all():
     query = Auctionhouse.query.all()
     return json.dumps([obj.to_dict() for obj in query])
 
+# POST requests
 
-@app.route('/restaurants/posts/', methods = ['POST'])
+@app.route('/restaurants/', methods = ['POST'])
 def create_rest():
     #error check
     if not request.json or not 'Name' in request.json:
         abort(400)
 
-    rest = Restaurant(request.json.get('Name',''), request.json.get('City',''), request.json.get('Neighborhood',''), request.json.get('Address',''), request.json.get('Picture_url',''), request.json.get('Latitude',''), request.json.get('Longitude',''), request.json.get('Rating',''), request.json.get('Review_Count',''), request.json.get('Phone',''), request.json.get('Rest_key',''))
+    rest = Restaurants(request.json.get('Name',''), request.json.get('City',''),
+            request.json.get('Neighborhood',''), request.json.get('Address',''),
+            request.json.get('Picture_url',''), request.json.get('Latitude',0.0),
+            request.json.get('Longitude',0.0), request.json.get('Rating',0.0), 
+            request.json.get('Review_Count',0), request.json.get('Phone',0),
+            request.json.get('Rest_key',''))
 
+    # print rest
     db.session.add(rest)
     db.session.commit()
 
-    return jsonify({'restaurant': rest}), 201
+    return json.dumps(rest.to_dict()), 201
 
+@app.route('/users/', methods = ['POST'])
+def new_user():
+    # error check
+    if not request.json or not 'Username' in request.json:
+        abort(400)
+
+    username = request.json.get('Username')
+    password = request.json.get('Password')
+    
+    if username is None or password is None:
+        print "Problem 1"
+        abort(400) # missing arguments
+    if Users.query.filter_by(Facebook_id = username).first() is not None:
+        print "Problem 2"
+        abort(400) # existing user
+    user = Users(Facebook_id = username, Password_hash = password,
+            Lastname = request.json.get('Lastname',''), Firstname = request.json.get('Firstname',''), 
+            Credits = 0, Scores = 0.0, Number_of_scores = 0, 
+            Number_of_runs = 0, Give_current = 0, Receive_current = 0)
+    
+    user.hash_password(password)
+    
+    db.session.add(user)
+    db.session.commit()
+
+    return json.dumps(user.to_dict())
+
+@app.route('/auctionhouse/', methods = ['POST'])
+def new_entry():
+    if not 'Restaurant_id' in request.json or not 'slot_time' in request.json:
+        abort(400) # Insufficient information provided
+
+    
+    entry = Auctionhouse(Restaurant_id = request.json.get('Restaurant_id'),
+                        date = request.json.get('date'),
+                        slot_time = request.json.get('slot_time'),
+                        Rest_slot = '', slot_taken = 0, slot_completed = 0)
+    
+    entry.Rest_slot = str(entry.Restaurant_id) + str(entry.date) + str(entry.slot_time)
+    
+    db.session.add(entry)
+    db.session.commit()
+
+    return json.dumps(entry.to_dict())
+
+
+# DELETE requests
 
 @app.route('/restaurants/<int:id>', methods = ['DELETE'])
 def delete_rest(id):
@@ -147,6 +129,30 @@ def delete_rest(id):
 
     return jsonify({'result': True})
 
+@app.route('/users/<facebook_id>', methods = ['DELETE'])
+def delete_user(facebook_id):
+    
+    # Need to enter super user and password to get authorized
+    super_user = request.json.get('Super_user')
+    super_password = request.json.get('Super_password')
+    
+    if super_user is None or super_password is None:
+        abort(400) # No Authorization
+    if not pwd.context.encrypt(super_password) == superpass:
+        abort(400) # Super_password is wrong
+    else:
+        db.session.delete(Users.query.get(facebook_id))
+        db.session.commit()
+
+    return jsonify({'result': True})
+
+@app.route('/auctionhouse/<Rest_slot>', methods = ['DELETE'])
+def delete_entry(Rest_slot):
+
+    db.session.delete(Auctionhouse.query.get(Rest_slot))
+    db.session.commit()
+
+    return jsonify({'result': True})
 
 @app.route('/restaurants/put/<int:id>', methods = ['PUT'])
 def update_rest(id):
@@ -167,6 +173,67 @@ def update_rest(id):
     db.session.commit()
 
     return json.dumps(rest.to_dict())
+
+# Should need authorization to update
+@app.route('/users/put/<facebook_id>', methods = ['PUT'])
+def update_user(facebook_id):
+    user = Users.query.get(facebook_id)
+    super_user = request.json.get('Super_user')
+    super_password = request.json.get('Super_password')
+    
+    if super_user is None or super_password is None:
+        user.Lastname = request.json.get('Lastname', user.Lastname)
+        user.Firstname = request.json.get('Firstname', user.Firstname)
+
+    if not pwd.context.encrypt(super_password) == superpass:
+        abort(400) # Super_password is wrong
+    else:
+        user.Lastname = request.json.get('Lastname', user.Lastname)
+        user.Firstname = request.json.get('Firstname', user.Firstname)
+        user.Credits = request.json.get('Credits', user.Credits)
+        user.Scores = request.json.get('Scores', user.Scores)
+        user.Number_of_scores = request.json.get('Number_of_scores', user.Number_of_scores)
+        user.Number_of_runs = request.json.get('Number_of_runs', user.Number_of_runs)
+        user.Give_current = request.json.get('Give_current', user.Give_current)
+        user.Receive_current = request.json.get('Receive_current', user.Number_of_scores)
+
+    db.session.commit()
+
+    return json.dumps(user.to_dict())
+
+@app.route('/auctionhouse/put/<Rest_slot>', methods = ['PUT'])
+def update_entry(Rest_slot):
+    # Cannot change slot's restaurant name
+    entry = Auctionhouse.query.get(Rest_slot)
+    entry.date = request.json.get('date', entry.date)
+    entry.slot_time = request.json.get('slot_time', entry.slot_time)
+    entry.slot_taken = request.json.get('slot_taken', entry.slot_taken)
+    entry.slot_completed = request.json.get('slot_completed', entry.slot_completed)
+
+    # Now update Primary key
+    entry.Rest_slot = str(entry.Restaurant_id) + str(entry.date) + str(entry.slot_time)
+    
+    db.session.commit()
+
+    return json.dumps(entry.to_dict())
+
+@app.route('/users/token')
+@auth.login_required
+def get_auth_token():
+    token = g.user.generate_auth_token()
+    return jsonify({'token':token.decode('ascii') })
+
+@auth.verify_password
+def verify_password(username_or_token, password):
+    # first try to authenticate by token
+    user = Users.verify_auth_token(username_or_token)
+    if not user:
+        # try to authenticate with username/password
+        user = User.query.filter_by(username = username_or_token).first()
+        if not user or not user.verify_password(password):
+            return False
+    g.user = user
+    return True
 
 
 if __name__ == '__main__':

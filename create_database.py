@@ -1,4 +1,4 @@
-from Restaurants import db
+from Model import db
 
 db.create_all()
 
